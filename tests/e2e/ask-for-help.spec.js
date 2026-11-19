@@ -171,7 +171,7 @@ test.describe('with no signal', () => {
     await expect(page.getByLabel("What's going on?")).toHaveCount(0)
 
     // The first try got through just as the signal dropped.
-    village.seed('help_requests', [{ id: 77, requester_id: village.user.id, description: 'Need a ride to the pharmacy.', created_at: new Date().toISOString() }])
+    village.seed('help_requests', [{ id: 77, requester_id: village.user.id, skill_needed: 'Rides and Transportation', description: 'Need a ride to the pharmacy.', for_name: null, created_at: new Date().toISOString() }])
     await context.setOffline(false)
 
     await expect(page.getByText('Your saved request was sent.')).toBeVisible()

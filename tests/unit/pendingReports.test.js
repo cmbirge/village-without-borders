@@ -142,6 +142,30 @@ describe('a report that may already have reached VWB', () => {
     expect(pendingReports(ME)).toEqual([])
   })
 
+  it('two reports with the same title at different places are never thrown away', async () => {
+    savePendingReport(ME, report('Tree down', { location_name: 'Mill Road' }))
+    savePendingReport(ME, report('Tree down', { location_name: 'Oak Street' }))
+    const sent = await sendPendingReports(ME)
+    // Each one is either posted, or kept on the phone to ask "Is this the same one?".
+    const kept = pendingReports(ME)
+    expect(sent.length + kept.length).toBe(2)
+    expect(events().map((e) => e.location_name)).toEqual(expect.arrayContaining(['Mill Road']))
+    for (const k of kept) expect(k.problem).toBe('similar')
+    // "No, it is different" sends the held one.
+    for (const k of kept) sendReportAnyway(ME, k.key)
+    await sendPendingReports(ME)
+    expect(events().map((e) => e.location_name)).toEqual(['Mill Road', 'Oak Street'])
+    expect(pendingReports(ME)).toEqual([])
+  })
+
+  it('a true copy with no place named is still caught', async () => {
+    clockAt(NOON)
+    savePendingReport(ME, report('Power out', { location_name: null }))
+    db.seed('emergency_events', [{ id: 321, ...report('Power out', { location_name: null }), created_by: ME, created_at: NOON.toISOString() }])
+    expect(await sendPendingReports(ME)).toEqual([{ id: 321, title: 'Power out' }])
+    expect(tries()).toBe(0)
+  })
+
   it('does not mistake a report of mine from earlier in the day for a copy', async () => {
     clockAt(NOON)
     savePendingReport(ME, report())

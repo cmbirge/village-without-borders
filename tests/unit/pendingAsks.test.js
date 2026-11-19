@@ -216,7 +216,7 @@ describe('an ask that may already have reached VWB', () => {
   it('is not posted a second time: it is just cleared from the phone and counted as sent', async () => {
     clockAt(NOON)
     savePendingAsk(ME, ask('Ride to the clinic'))
-    db.seed('help_requests', [{ id: 900, requester_id: ME, description: 'Ride to the clinic', created_at: new Date(NOON.getTime() - 2 * 60 * 1000).toISOString() }])
+    db.seed('help_requests', [{ id: 900, requester_id: ME, skill_needed: 'Rides', description: 'Ride to the clinic', created_at: new Date(NOON.getTime() - 2 * 60 * 1000).toISOString() }])
     expect(await sendPendingAsks(ME)).toBe(1)
     expect(tries()).toBe(0)
     expect(posted()).toHaveLength(1)
@@ -240,6 +240,37 @@ describe('an ask that may already have reached VWB', () => {
     ])
     expect(await sendPendingAsks(ME)).toBe(1)
     expect(posted()).toHaveLength(3)
+  })
+
+  it('two different asks with the same words both go out', async () => {
+    savePendingAsk(ME, ask('Please call me', { skill_needed: 'Rides' }))
+    savePendingAsk(ME, ask('Please call me', { skill_needed: 'Food and Meals' }))
+    expect(await sendPendingAsks(ME)).toBe(2)
+    expect(posted().map((r) => [r.skill_needed, r.description])).toEqual([['Rides', 'Please call me'], ['Food and Meals', 'Please call me']])
+    expect(pendingAsks(ME)).toEqual([])
+  })
+
+  it('the same words for two different people both go out', async () => {
+    savePendingAsk(ME, ask('Needs a ride to church', { for_name: 'Mom', for_consent: true }))
+    savePendingAsk(ME, ask('Needs a ride to church', { for_name: null }))
+    expect(await sendPendingAsks(ME)).toBe(2)
+    expect(posted().map((r) => r.for_name)).toEqual(['Mom', null])
+  })
+
+  it('is posted when the look-alike has the same words but is for something else', async () => {
+    clockAt(NOON)
+    savePendingAsk(ME, ask('Please call me', { skill_needed: 'Food and Meals' }))
+    db.seed('help_requests', [{ id: 900, requester_id: ME, skill_needed: 'Rides', description: 'Please call me', for_name: null, created_at: NOON.toISOString() }])
+    expect(await sendPendingAsks(ME)).toBe(1)
+    expect(posted()).toHaveLength(2)
+  })
+
+  it('a true copy is still caught when the ask is for someone else', async () => {
+    clockAt(NOON)
+    savePendingAsk(ME, ask('Needs a ride to church', { for_name: 'Mom' }))
+    db.seed('help_requests', [{ id: 900, requester_id: ME, skill_needed: 'Rides', description: 'Needs a ride to church', for_name: 'Mom', created_at: NOON.toISOString() }])
+    expect(await sendPendingAsks(ME)).toBe(1)
+    expect(tries()).toBe(0)
   })
 
   it('is still posted when the look for a copy fails for a reason other than signal', async () => {
@@ -276,7 +307,7 @@ describe('when the signal drops again while sending', () => {
     clockAt(NOON)
     savePendingAsk(ME, ask('already there'))
     savePendingAsk(ME, ask('still waiting'))
-    db.seed('help_requests', [{ id: 900, requester_id: ME, description: 'already there', created_at: NOON.toISOString() }])
+    db.seed('help_requests', [{ id: 900, requester_id: ME, skill_needed: 'Rides', description: 'already there', created_at: NOON.toISOString() }])
     db.failNext('help_requests', 'insert', NO_SIGNAL)
     expect(await sendPendingAsks(ME)).toBe(1)
     expect(pendingAsks(ME).map((a) => a.row.description)).toEqual(['still waiting'])

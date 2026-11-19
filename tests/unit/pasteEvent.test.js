@@ -176,4 +176,31 @@ describe('parsePastedEvent', () => {
     expect(draft.title).toBe('Potluck')
     expect(draft.description).toHaveLength(3000)
   })
+
+  it.each([
+    ['Monthly Meeting'], ['Money Smart Workshop'], ['Friendsgiving Potluck'], ['Saturday Market'], ['Sunday Supper'], ['Wednesday Walkers'],
+  ])('keeps the name "%s", even though it starts like a day of the week', (name) => {
+    const draft = parsePastedEvent([name, 'October 10 at 6 PM', 'Community Center'].join('\n'), NOW)
+    expect(draft.title).toBe(name)
+    expect(draft.date).toBe('2026-10-10')
+  })
+
+  it.each([
+    ['Saturday at 6 PM'], ['Sat, 6 PM'], ['Saturday'], ['Friday night'], ['Sat Oct 10'], ['Tues. 6 PM'],
+  ])('does not take a line that only says when ("%s") as the name', (when) => {
+    const draft = parsePastedEvent([when, 'Harvest Dinner', 'October 10'].join('\n'), NOW)
+    expect(draft.title).toBe('Harvest Dinner')
+  })
+
+  it('reads "October 10th at 6 PM"', () => {
+    const draft = parsePastedEvent('Harvest Dinner\nOctober 10th at 6 PM', NOW)
+    expect(draft).toMatchObject({ title: 'Harvest Dinner', date: '2026-10-10', startTime: '18:00' })
+    expect(draft.missing).not.toContain('the date')
+  })
+
+  it('passes over a line that only looks like a date, and finds the real one after it', () => {
+    const draft = parsePastedEvent('Support Night\nCrisis line open 24/7\nOctober 10 at 6 PM', NOW)
+    expect(draft).toMatchObject({ title: 'Support Night', date: '2026-10-10', startTime: '18:00' })
+    expect(draft.description).toContain('Crisis line open 24/7')
+  })
 })

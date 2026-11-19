@@ -281,5 +281,25 @@ describe('loadMyTaskOverview', () => {
     expect(out.requests.map((r) => r.key)).toEqual(['r1'])
     expect(out.offers).toEqual([])
     expect(console.error).toHaveBeenCalled()
+    // ...and it says the load was not whole, so the page can tell the person.
+    expect(out.ok).toBe(false)
+  })
+
+  it('says ok when everything loaded, even with nothing to show', async () => {
+    expect(await loadMyTaskOverview(ME)).toEqual({ requests: [], offers: [], active: [], archived: [], ok: true })
+  })
+
+  it('does not say ok when nothing could be loaded: a failed load is not "no tasks"', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    for (const table of ['help_requests', 'skill_matches', 'offers', 'task_feedback']) db.failNext(table, 'select')
+    expect(await loadMyTaskOverview(ME)).toEqual({ requests: [], offers: [], active: [], archived: [], ok: false })
+  })
+
+  it('does not say ok when the helpers on your requests could not be loaded', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    db.seed('help_requests', [ask(1)])
+    // The first look at skill_matches (tasks you help with) works. The second (helpers on your requests) fails.
+    db.failNext('skill_matches', 'select', undefined, { skip: 1 })
+    expect((await loadMyTaskOverview(ME)).ok).toBe(false)
   })
 })

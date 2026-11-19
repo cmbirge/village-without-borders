@@ -22,6 +22,10 @@ describe('waitTime', () => {
     expect(waitTime(ts)).toBe('')
   })
 
+  it('gives nothing, not the words "Invalid Date", for a time that can\'t be read', () => {
+    expect(waitTime('garbage')).toBe('')
+  })
+
   it('follows the app\'s language when it is Spanish', async () => {
     const english = waitTime('2026-11-17T20:15:00Z')
     await setLangLocal('es')

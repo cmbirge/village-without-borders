@@ -38,6 +38,17 @@ describe('acceptHelpOffer', () => {
     expect(db.rows('conversations')).toEqual([{ id: 5, request_id: 77, helper_id: 'helper', requester_id: 'me' }])
   })
 
+  it('when the two of you already have two chats, reuses the oldest and does not make a third', async () => {
+    db.seed('conversations', [
+      { id: 8, request_id: 4, helper_id: 'me', requester_id: 'helper', created_at: '2026-11-10T12:00:00.000Z' },
+      { id: 5, request_id: 3, helper_id: 'helper', requester_id: 'me', created_at: '2026-11-02T12:00:00.000Z' },
+    ])
+    const out = await acceptHelpOffer(offer(), 'me')
+    expect(out).toEqual({ ok: true, convoId: 5 })
+    expect(db.rows('conversations')).toHaveLength(2)
+    expect(db.rows('conversations').find((c) => c.id === 5).request_id).toBe(77)
+  })
+
   it('reuses the chat when it was started the other way round (they asked, you helped)', async () => {
     db.seed('conversations', [
       { id: 6, request_id: 3, helper_id: 'me', requester_id: 'helper' },

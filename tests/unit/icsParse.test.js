@@ -365,3 +365,59 @@ describe('parseIcs, repeating events', () => {
     expect(result.repeating).toBe(1)
   })
 })
+
+describe('parseIcs, where a repeating event ends', () => {
+  const days = (result) => result.events.map((e) => new Date(e.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))
+
+  it('an all-day event that repeats until Oct 7 does not also show on Oct 8', () => {
+    const result = parseIcs(calendar([
+      'UID:all-day-until',
+      'SUMMARY:Coat drive drop-off',
+      'DTSTART;VALUE=DATE:20261005',
+      'RRULE:FREQ=DAILY;UNTIL=20261007',
+    ]), NOW)
+    expect(days(result)).toEqual(['Oct 5, 2026', 'Oct 6, 2026', 'Oct 7, 2026'])
+  })
+
+  it('an end date with a time is exact: nothing repeats after that moment', () => {
+    const result = parseIcs(calendar([
+      'UID:timed-until',
+      'SUMMARY:Morning walk',
+      'DTSTART:20261005T130000Z',
+      'RRULE:FREQ=DAILY;UNTIL=20261007T130000Z',
+    ]), NOW)
+    expect(days(result)).toEqual(['Oct 5, 2026', 'Oct 6, 2026', 'Oct 7, 2026'])
+  })
+
+  it('a plain end date still takes in an event later that same day', () => {
+    const result = parseIcs(calendar([
+      'UID:evening-until',
+      'SUMMARY:Evening class',
+      'DTSTART;TZID=America/New_York:20261005T190000',
+      'RRULE:FREQ=DAILY;UNTIL=20261007',
+    ]), NOW)
+    expect(days(result)).toEqual(['Oct 5, 2026', 'Oct 6, 2026', 'Oct 7, 2026'])
+  })
+
+  it('a yearly event on Feb 29 shows on Feb 29 only, never on March 1', () => {
+    const leapDay = ['UID:leap', 'SUMMARY:Leap day potluck', 'DTSTART;VALUE=DATE:20240229', 'RRULE:FREQ=YEARLY']
+    // Sept 2026 to Sept 2027 has no Feb 29.
+    expect(parseIcs(calendar(leapDay), NOW).events).toEqual([])
+    // Sept 2027 to Sept 2028 does.
+    expect(days(parseIcs(calendar(leapDay), new Date('2027-09-01T12:00:00Z')))).toEqual(['Feb 29, 2028'])
+  })
+})
+
+describe('parseIcs, special characters in names and notes', () => {
+  const BACKSLASH = String.fromCharCode(92)
+  const titleOf = (summary) => parseIcs(calendar(['UID:esc', 'SUMMARY:' + summary, 'DTSTART:20261005T130000Z']), NOW).events[0].title
+
+  it('keeps a real backslash, even when the letter n comes right after it', () => {
+    // In the file a real backslash is written twice.
+    expect(titleOf('C:' + BACKSLASH + BACKSLASH + 'new folder')).toBe('C:' + BACKSLASH + 'new folder')
+  })
+
+  it('still reads escaped commas, semicolons and line breaks', () => {
+    expect(titleOf('Soup' + BACKSLASH + ', salad' + BACKSLASH + '; bread' + BACKSLASH + 'nBring a bowl')).toBe('Soup, salad; bread' + String.fromCharCode(10) + 'Bring a bowl')
+  })
+})
